@@ -1,68 +1,59 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import sqlite3
+from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy.orm import declarative_base, sessionmaker
 import os
+
+# ⚠️ PONÉ ACÁ TU CONTRASEÑA REAL DE SUPABASE
+DATABASE_URL = "postgresql://postgres:VEB%%44082026@db.gumddxhoyltdpdlskqak.supabase.co:5432/postgres"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# --- TABLAS EN POSTGRESQL ---
+class EntidadDB(Base):
+    __tablename__ = "entidades"
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String, nullable=False)
+    tipo = Column(String, nullable=False)
+    cuit = Column(String, default="")
+    email = Column(String, default="")
+    telefono = Column(String, default="")
+    direccion = Column(String, default="")
+
+class FacturaDB(Base):
+    __tablename__ = "facturas"
+    id = Column(Integer, primary_key=True, index=True)
+    entidad_id = Column(Integer, nullable=False)
+    entidad_nombre = Column(String, default="")
+    tipo_comprobante = Column(String, nullable=False)
+    numero = Column(String, nullable=False)
+    fecha = Column(String, nullable=False)
+    monto_neto = Column(Float, nullable=False)
+    alicuota_iva = Column(Float, nullable=False)
+    monto_iva = Column(Float, nullable=False)
+    monto_total = Column(Float, nullable=False)
+    concepto = Column(String, default="")
+
+class PagoDB(Base):
+    __tablename__ = "pagos"
+    id = Column(Integer, primary_key=True, index=True)
+    entidad_id = Column(Integer, nullable=False)
+    entidad_nombre = Column(String, default="")
+    tipo_operacion = Column(String, nullable=False)
+    medio_pago = Column(String, nullable=False)
+    fecha = Column(String, nullable=False)
+    monto = Column(Float, nullable=False)
+    observaciones = Column(String, default="")
+
+# Crear automáticamente las tablas en Supabase
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-DB_FILE = "sistema.db"
-
-# Inicialización de la base de datos SQLite
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    # Tabla Entidades
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS entidades (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            tipo TEXT NOT NULL,
-            cuit TEXT DEFAULT '',
-            email TEXT DEFAULT '',
-            telefono TEXT DEFAULT '',
-            direccion TEXT DEFAULT ''
-        )
-    ''')
-    
-    # Tabla Facturas
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS facturas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            entidad_id INTEGER NOT NULL,
-            entidad_nombre TEXT DEFAULT '',
-            tipo_comprobante TEXT NOT NULL,
-            numero TEXT NOT NULL,
-            fecha TEXT NOT NULL,
-            monto_neto REAL NOT NULL,
-            alicuota_iva REAL NOT NULL,
-            monto_iva REAL NOT NULL,
-            monto_total REAL NOT NULL,
-            concepto TEXT DEFAULT ''
-        )
-    ''')
-    
-    # Tabla Pagos
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS pagos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            entidad_id INTEGER NOT NULL,
-            entidad_nombre TEXT DEFAULT '',
-            tipo_operacion TEXT NOT NULL,
-            medio_pago TEXT NOT NULL,
-            fecha TEXT NOT NULL,
-            monto REAL NOT NULL,
-            observaciones TEXT DEFAULT ''
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Modelos Pydantic
+# --- MODELOS PYDANTIC ---
 class Entidad(BaseModel):
     id: int | None = None
     nombre: str
@@ -89,8 +80,8 @@ class ComprobantePago(BaseModel):
     id: int | None = None
     entidad_id: int
     entidad_nombre: str = ""
-    tipo_operacion: str  # COBRO / PAGO
-    medio_pago: str      # Efectivo, Transferencia, Cheque
+    tipo_operacion: str
+    medio_pago: str
     fecha: str
     monto: float
     observaciones: str = ""
@@ -98,149 +89,126 @@ class ComprobantePago(BaseModel):
 # --- ENDPOINTS ENTIDADES ---
 @app.get("/api/entidades")
 def obtener_entidades():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM entidades")
-    filas = cursor.fetchall()
-    conn.close()
-    return [dict(f) for f in filas]
+    db = SessionLocal()
+    entidades = db.query(EntidadDB).all()
+    db.close()
+    return [
+        {
+            "id": e.id, "nombre": e.nombre, "tipo": e.tipo,
+            "cuit": e.cuit, "email": e.email, "telefono": e.telefono, "direccion": e.direccion
+        } for e in entidades
+    ]
 
 @app.post("/api/entidades")
 def guardar_entidad(entidad: Entidad):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO entidades (nombre, tipo, cuit, email, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)",
-        (entidad.nombre, entidad.tipo, entidad.cuit, entidad.email, entidad.telefono, entidad.direccion)
-    )
-    entidad_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    entidad_dict = entidad.dict()
-    entidad_dict["id"] = entidad_id
-    return entidad_dict
+    db = SessionLocal()
+    db_entidad = EntidadDB(**entidad.dict(exclude={"id"}))
+    db.add(db_entidad)
+    db.commit()
+    db.refresh(db_entidad)
+    db.close()
+    return db_entidad
 
 @app.delete("/api/entidades/{entidad_id}")
 def eliminar_entidad(entidad_id: int):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM entidades WHERE id = ?", (entidad_id,))
-    filas_afectadas = cursor.rowcount
-    conn.commit()
-    conn.close()
-    
-    if filas_afectadas == 0:
+    db = SessionLocal()
+    entidad = db.query(EntidadDB).filter(EntidadDB.id == entidad_id).first()
+    if not entidad:
+        db.close()
         raise HTTPException(status_code=404, detail="Entidad no encontrada")
+    db.delete(entidad)
+    db.commit()
+    db.close()
     return {"message": "Entidad eliminada"}
 
 # --- ENDPOINTS FACTURACIÓN ---
 @app.get("/api/facturas")
 def obtener_facturas():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM facturas")
-    filas = cursor.fetchall()
-    conn.close()
-    return [dict(f) for f in filas]
+    db = SessionLocal()
+    facturas = db.query(FacturaDB).all()
+    db.close()
+    return [
+        {
+            "id": f.id, "entidad_id": f.entidad_id, "entidad_nombre": f.entidad_nombre,
+            "tipo_comprobante": f.tipo_comprobante, "numero": f.numero, "fecha": f.fecha,
+            "monto_neto": f.monto_neto, "alicuota_iva": f.alicuota_iva,
+            "monto_iva": f.monto_iva, "monto_total": f.monto_total, "concepto": f.concepto
+        } for f in facturas
+    ]
 
 @app.post("/api/facturas")
 def guardar_factura(factura: Factura):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        """INSERT INTO facturas 
-           (entidad_id, entidad_nombre, tipo_comprobante, numero, fecha, monto_neto, alicuota_iva, monto_iva, monto_total, concepto) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (factura.entidad_id, factura.entidad_nombre, factura.tipo_comprobante, factura.numero, 
-         factura.fecha, factura.monto_neto, factura.alicuota_iva, factura.monto_iva, factura.monto_total, factura.concepto)
-    )
-    factura_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-
-    factura_dict = factura.dict()
-    factura_dict["id"] = factura_id
-    return factura_dict
+    db = SessionLocal()
+    db_factura = FacturaDB(**factura.dict(exclude={"id"}))
+    db.add(db_factura)
+    db.commit()
+    db.refresh(db_factura)
+    db.close()
+    return db_factura
 
 @app.delete("/api/facturas/{factura_id}")
 def eliminar_factura(factura_id: int):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM facturas WHERE id = ?", (factura_id,))
-    filas_afectadas = cursor.rowcount
-    conn.commit()
-    conn.close()
-
-    if filas_afectadas == 0:
+    db = SessionLocal()
+    factura = db.query(FacturaDB).filter(FacturaDB.id == factura_id).first()
+    if not factura:
+        db.close()
         raise HTTPException(status_code=404, detail="Factura no encontrada")
+    db.delete(factura)
+    db.commit()
+    db.close()
     return {"ok": True, "message": "Factura eliminada"}
 
 # --- ENDPOINTS COBROS Y PAGOS ---
 @app.get("/api/pagos")
 def obtener_pagos():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM pagos")
-    filas = cursor.fetchall()
-    conn.close()
-    return [dict(f) for f in filas]
+    db = SessionLocal()
+    pagos = db.query(PagoDB).all()
+    db.close()
+    return [
+        {
+            "id": p.id, "entidad_id": p.entidad_id, "entidad_nombre": p.entidad_nombre,
+            "tipo_operacion": p.tipo_operacion, "medio_pago": p.medio_pago,
+            "fecha": p.fecha, "monto": p.monto, "observaciones": p.observaciones
+        } for p in pagos
+    ]
 
 @app.post("/api/pagos")
 def guardar_pago(pago: ComprobantePago):
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute(
-        """INSERT INTO pagos 
-           (entidad_id, entidad_nombre, tipo_operacion, medio_pago, fecha, monto, observaciones) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)""",
-        (pago.entidad_id, pago.entidad_nombre, pago.tipo_operacion, pago.medio_pago, pago.fecha, pago.monto, pago.observaciones)
-    )
-    pago_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-
-    pago_dict = pago.dict()
-    pago_dict["id"] = pago_id
-    return pago_dict
+    db = SessionLocal()
+    db_pago = PagoDB(**pago.dict(exclude={"id"}))
+    db.add(db_pago)
+    db.commit()
+    db.refresh(db_pago)
+    db.close()
+    return db_pago
 
 # --- ENDPOINT ESTADO DE CUENTA ---
 @app.get("/api/estado-cuenta/{entidad_id}")
 def obtener_estado_cuenta(entidad_id: int):
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT * FROM facturas WHERE entidad_id = ?", (entidad_id,))
-    facturas = [dict(f) for f in cursor.fetchall()]
-
-    cursor.execute("SELECT * FROM pagos WHERE entidad_id = ?", (entidad_id,))
-    pagos = [dict(p) for p in cursor.fetchall()]
-    conn.close()
+    db = SessionLocal()
+    facturas = db.query(FacturaDB).filter(FacturaDB.entidad_id == entidad_id).all()
+    pagos = db.query(PagoDB).filter(PagoDB.entidad_id == entidad_id).all()
+    db.close()
 
     movimientos = []
 
     for fact in facturas:
-        monto_total = fact.get("monto_total", 0.0)
         movimientos.append({
-            "fecha": fact.get("fecha", ""),
-            "comprobante": f"{fact.get('tipo_comprobante', '')} N° {fact.get('numero', '')}",
-            "concepto": fact.get("concepto", ""),
-            "debe": monto_total,
+            "fecha": fact.fecha or "",
+            "comprobante": f"{fact.tipo_comprobante} N° {fact.numero}",
+            "concepto": fact.concepto or "",
+            "debe": fact.monto_total,
             "haber": 0.0
         })
 
     for p in pagos:
-        es_cobro = p.get("tipo_operacion") == "COBRO"
+        es_cobro = p.tipo_operacion == "COBRO"
         movimientos.append({
-            "fecha": p.get("fecha", ""),
-            "comprobante": f"Recibo ({p.get('tipo_operacion', '')} - {p.get('medio_pago', '')})",
-            "concepto": p.get("observaciones", ""),
-            "debe": 0.0 if es_cobro else p.get("monto", 0.0),
-            "haber": p.get("monto", 0.0) if es_cobro else 0.0
+            "fecha": p.fecha or "",
+            "comprobante": f"Recibo ({p.tipo_operacion} - {p.medio_pago})",
+            "concepto": p.observaciones or "",
+            "debe": 0.0 if es_cobro else p.monto,
+            "haber": p.monto if es_cobro else 0.0
         })
 
     movimientos.sort(key=lambda x: x["fecha"])

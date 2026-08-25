@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 import os
 
 # ⚠️ PONÉ ACÁ TU CONTRASEÑA REAL DE SUPABASE
-DATABASE_URL = "postgresql://postgres:VEB%%44082026@db.gumddxhoyltdpdlskqak.supabase.co:5432/postgres"
+DATABASE_URL = "postgresql://postgres:VEB%%44082026@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

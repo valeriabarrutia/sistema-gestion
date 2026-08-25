@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "nombre": "COOP ELECTRICA Y AGUAS LEVALLE",
+    "tipo": "CLIENTE",
+    "cuit": "30545735217",
+    "email": "",
+    "telefono": "",
+    "direccion": ""
+  },
+  {
+    "id": 2,
+    "nombre": "COOP ELECTRICA O.S ACEQUIAS LIMITADA",
+    "tipo": "CLIENTE",
+    "cuit": "30545721461",
+    "email": "",
+    "telefono": "",
+    "direccion": ""
+  },
+  {
+    "id": 3,
+    "nombre": "COOP ELECTRICA DE VILLA VALERIA",
+    "tipo": "CLIENTE",
+    "cuit": "33545726349",
+    "email": "",
+    "telefono": "",
+    "direccion": ""
+  },
+  {
+    "id": 4,
+    "nombre": "CEYAL",
+    "tipo": "CLIENTE",
+    "cuit": "30545752685",
+    "email": "",
+    "telefono": "",
+    "direccion": ""
+  }
+]

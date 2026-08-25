@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Sistema de Gestión</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f8f9fa; }
+        .tabs { display: flex; gap: 5px; margin-bottom: 20px; }
+        .tab { padding: 10px 20px; background: #e0e0e0; border: none; font-weight: bold; cursor: pointer; border-radius: 4px 4px 0 0; }
+        .tab.active { background: #1d3557; color: white; }
+        .card { background: white; padding: 20px; border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+        .form-group input, .form-group select { padding: 6px; border: 1px solid #ccc; border-radius: 3px; }
+        .btn-guardar { background: #457b9d; color: white; border: none; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { border: 1px solid #e0e0e0; padding: 8px; text-align: left; font-size: 14px; }
+        th { background-color: #f1f1f1; }
+        .btn-eliminar { background: #e63946; color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; }
+        .saldo-box { font-size: 18px; font-weight: bold; padding: 10px; border-radius: 4px; background: #eef2f5; display: inline-block; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Sistema de Gestión</h2>
+
+    <div class="tabs">
+        <button class="tab active" onclick="cambiarSolapa('entidades', this)">Entidades</button>
+        <button class="tab" onclick="cambiarSolapa('facturacion', this)">Facturación</button>
+        <button class="tab" onclick="cambiarSolapa('cobros', this)">Cobros y Pagos</button>
+        <button class="tab" onclick="cambiarSolapa('estado', this)">Estado de Cuenta</button>
+    </div>
+
+    <!-- Pestaña Entidades -->
+    <div id="sec-entidades" class="card tab-content active">
+        <h3>Registrar Entidad (Cliente/Proveedor)</h3>
+        <form id="formEntidad">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Nombre *</label>
+                    <input type="text" id="nombre" required>
+                </div>
+                <div class="form-group">
+                    <label>Tipo *</label>
+                    <select id="tipo">
+                        <option value="CLIENTE">Cliente</option>
+                        <option value="PROVEEDOR">Proveedor</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>CUIT</label>
+                    <input type="text" id="cuit">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="email">
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" id="telefono">
+                </div>
+                <div class="form-group">
+                    <label>Dirección</label>
+                    <input type="text" id="direccion">
+                </div>
+                <div class="form-group" style="justify-content: flex-end;">
+                    <button type="submit" class="btn-guardar">Guardar Entidad</button>
+                </div>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>CUIT</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Dirección</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaCuerpo"></tbody>
+        </table>
+    </div>
+
+    <!-- Pestaña Facturación -->
+    <div id="sec-facturacion" class="card tab-content">
+        <h3>Emitir Comprobante</h3>
+        <form id="formFactura">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Cliente / Entidad *</label>
+                    <select id="facturaEntidad" required>
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo *</label>
+                    <select id="facturaTipo">
+                        <option value="Factura A">Factura A</option>
+                        <option value="Factura B">Factura B</option>
+                        <option value="Factura C">Factura C</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>N° Comprobante *</label>
+                    <input type="text" id="facturaNumero" placeholder="0001-00000001" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha *</label>
+                    <input type="date" id="facturaFecha" required>
+                </div>
+                <div class="form-group">
+                    <label>Neto Gravado ($) *</label>
+                    <input type="number" step="0.01" id="facturaNeto" required>
+                </div>
+                <div class="form-group">
+                    <label>Alícuota IVA *</label>
+                    <select id="facturaAlicuota">
+                        <option value="21">21%</option>
+                        <option value="10.5">10.5%</option>
+                        <option value="27">27%</option>
+                        <option value="0">0% / Exento</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Concepto</label>
+                    <input type="text" id="facturaConcepto">
+                </div>
+                <div class="form-group" style="justify-content: flex-end;">
+                    <button type="submit" class="btn-guardar">Guardar Factura</button>
+                </div>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Entidad</th>
+                    <th>Tipo</th>
+                    <th>Número</th>
+                    <th>Concepto</th>
+                    <th>Neto</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tablaFacturas"></tbody>
+        </table>
+    </div>
+
+    <!-- Pestaña Cobros y Pagos -->
+    <div id="sec-cobros" class="card tab-content">
+        <h3>Registrar Movimiento (Cobro / Pago)</h3>
+        <form id="formPago">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Entidad *</label>
+                    <select id="pagoEntidad" required>
+                        <option value="">Seleccionar...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipo Operación *</label>
+                    <select id="pagoTipoOperacion">
+                        <option value="COBRO">Cobro (Ingreso)</option>
+                        <option value="PAGO">Pago (Egreso)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Medio de Pago *</label>
+                    <select id="pagoMedio">
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                        <option value="Cheque">Cheque</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha *</label>
+                    <input type="date" id="pagoFecha" required>
+                </div>
+                <div class="form-group">
+                    <label>Monto ($) *</label>
+                    <input type="number" step="0.01" id="pagoMonto" required>
+                </div>
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <input type="text" id="pagoObservaciones">
+                </div>
+                <div class="form-group" style="justify-content: flex-end;">
+                    <button type="submit" class="btn-guardar">Guardar Movimiento</button>
+                </div>
+            </div>
+        </form>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Entidad</th>
+                    <th>Operación</th>
+                    <th>Medio de Pago</th>
+                    <th>Observaciones</th>
+                    <th>Monto</th>
+                </tr>
+            </thead>
+            <tbody id="tablaPagos"></tbody>
+        </table>
+    </div>
+
+    <!-- Pestaña Estado de Cuenta -->
+    <div id="sec-estado" class="card tab-content">
+        <h3>Estado de Cuenta por Entidad</h3>
+        <div class="form-grid" style="grid-template-columns: 300px 1fr;">
+            <div class="form-group">
+                <label>Seleccionar Entidad *</label>
+                <select id="estadoEntidad" onchange="cargarEstadoCuenta()">
+                    <option value="">Seleccionar...</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="resumenSaldo" class="saldo-box" style="display: none;">
+            Saldo Actual: <span id="montoSaldo">$0.00</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Comprobante / Detalle</th>
+                    <th>Concepto</th>
+                    <th>Debe</th>
+                    <th>Haber</th>
+                    <th>Saldo Acumulado</th>
+                </tr>
+            </thead>
+            <tbody id="tablaEstadoCuenta"></tbody>
+        </table>
+    </div>
+
+    <script>
+        let entidadesGlobales = [];
+
+        window.onload = function() {
+            cargarEntidades();
+        };
+
+        function cambiarSolapa(id, elemento) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`sec-${id}`).classList.add('active');
+            elemento.classList.add('active');
+            if (id === 'facturacion') cargarFacturas();
+            if (id === 'cobros') cargarPagos();
+            if (id === 'estado') poblarSelectEntidades();
+        }
+
+        async function cargarEntidades() {
+            try {
+                const res = await fetch('/api/entidades');
+                if (!res.ok) throw new Error(`Error: ${res.status}`);
+                entidadesGlobales = await res.json();
+                renderizarTabla(entidadesGlobales);
+                poblarSelectEntidades();
+            } catch (error) {
+                console.error('Error al cargar entidades:', error);
+            }
+        }
+
+        function poblarSelectEntidades() {
+            const selects = [
+                document.getElementById('facturaEntidad'),
+                document.getElementById('pagoEntidad'),
+                document.getElementById('estadoEntidad')
+            ];
+            selects.forEach(select => {
+                if (!select) return;
+                const valActual = select.value;
+                select.innerHTML = '<option value="">Seleccionar...</option>';
+                entidadesGlobales.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.id;
+                    opt.textContent = `${e.nombre} (${e.tipo})`;
+                    select.appendChild(opt);
+                });
+                select.value = valActual;
+            });
+        }
+
+        function renderizarTabla(entidades) {
+            const tbody = document.getElementById('tablaCuerpo');
+            tbody.innerHTML = '';
+            entidades.forEach(e => {
+                const fila = document.createElement('tr');
+                fila.innerHTML = `
+                    <td>${e.id || '-'}</td>
+                    <td><strong>${e.nombre || '-'}</strong></td>
+                    <td>${e.tipo || 'CLIENTE'}</td>
+                    <td>${e.cuit || '-'}</td>
+                    <td>${e.email || '-'}</td>
+                    <td>${e.telefono || '-'}</td>
+                    <td>${e.direccion || '-'}</td>
+                    <td><button class="btn-eliminar" onclick="eliminarEntidad(${e.id})">Eliminar</button></td>
+                `;
+                tbody.appendChild(fila);
+            });
+        }
+
+        async function eliminarEntidad(id) {
+            if (!confirm('¿Deseas eliminar este registro?')) return;
+            try {
+                const res = await fetch(`/api/entidades/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`Error: ${res.status}`);
+                await cargarEntidades();
+            } catch (error) {
+                console.error('Error al eliminar:', error);
+            }
+        }
+
+        // --- FACTURACIÓN ---
+        async function cargarFacturas() {
+            try {
+                const res = await fetch('/api/facturas');
+                if (!res.ok) throw new Error(`Error: ${res.status}`);
+                const facturas = await res.json();
+                renderizarTablaFacturas(facturas);
+            } catch (error) {
+                console.error('Error al cargar facturas:', error);
+            }
+        }
+
+        function renderizarTablaFacturas(facturas) {
+            const tbody = document.getElementById('tablaFacturas');
+            tbody.innerHTML = '';
+            facturas.forEach(f => {
+                const fila = document.createElement('tr');
+                const neto = f.monto_neto || f.monto || 0;
+                const iva = f.monto_iva || 0;
+                const total = f.monto_total || neto;
+
+                fila.innerHTML = `
+                    <td>${f.id || '-'}</td>
+                    <td>${f.fecha || '-'}</td>
+                    <td><strong>${f.entidad_nombre || '-'}</strong></td>
+                    <td>${f.tipo_comprobante || '-'}</td>
+                    <td>${f.numero || '-'}</td>
+                    <td>${f.concepto || '-'}</td>
+                    <td>$${parseFloat(neto).toLocaleString('es-AR', {minimumFractionDigits: 2})}</td>
+                    <td>$${parseFloat(iva).toLocaleString('es-AR', {minimumFractionDigits: 2})} (${f.alicuota_iva || 0}%)</td>
+                    <td><strong>$${parseFloat(total).toLocaleString('es-AR', {minimumFractionDigits: 2})}</strong></td>
+                    <td><button class="btn-eliminar" onclick="borrarFactura(${f.id})">Eliminar</button></td>
+                `;
+                tbody.appendChild(fila);
+            });
+        }
+
+        async function borrarFactura(id) {
+            if (confirm("¿Estás segura de eliminar esta factura?")) {
+                const res = await fetch(`/api/facturas/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    cargarFacturas();
+                } else {
+                    alert("Error al eliminar la factura");
+                }
+            }
+        }
+    </script>
+</body>
+</html>
+
+        

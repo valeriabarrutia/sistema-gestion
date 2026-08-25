@@ -1,0 +1,15 @@
+[
+    {
+        "id": 1,
+        "entidad_id": 1,
+        "entidad_nombre": "COOP ELECTRICA Y AGUAS LEVALLE",
+        "tipo_comprobante": "Factura A",
+        "numero": "004-4994",
+        "fecha": "2026-07-06",
+        "monto_neto": 468760.33,
+        "alicuota_iva": 21.0,
+        "monto_iva": 98439.6693,
+        "monto_total": 567199.9993,
+        "concepto": "servicios"
+    }
+]

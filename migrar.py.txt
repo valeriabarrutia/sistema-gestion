@@ -1,0 +1,42 @@
+import json
+import requests
+
+BASE_URL = "https://sistema-gestion-vjuq.onrender.com/api"
+
+def migrar_datos():
+    # 1. Migrar Entidades (usando datos.json)
+    try:
+        with open("datos.json", "r", encoding="utf-8") as f:
+            entidades = json.load(f)
+            for ent in entidades:
+                ent.pop("id", None)
+                res = requests.post(f"{BASE_URL}/entidades", json=ent)
+                print(f"Entidad '{ent.get('nombre')}' migrada:", res.status_code)
+    except FileNotFoundError:
+        print("No se encontró datos.json, omitiendo...")
+
+    # 2. Migrar Facturas
+    try:
+        with open("facturas.json", "r", encoding="utf-8") as f:
+            facturas = json.load(f)
+            for fac in facturas:
+                fac.pop("id", None)
+                res = requests.post(f"{BASE_URL}/facturas", json=fac)
+                print(f"Factura N° '{fac.get('numero')}' migrada:", res.status_code)
+    except FileNotFoundError:
+        print("No se encontró facturas.json, omitiendo...")
+
+    # 3. Migrar Cobros y Pagos
+    try:
+        with open("pagos.json", "r", encoding="utf-8") as f:
+            pagos = json.load(f)
+            for p in pagos:
+                p.pop("id", None)
+                res = requests.post(f"{BASE_URL}/pagos", json=p)
+                print(f"Pago/Cobro por ${p.get('monto')} migrado:", res.status_code)
+    except FileNotFoundError:
+        print("No se encontró pagos.json, omitiendo...")
+
+if __name__ == "__main__":
+    migrar_datos()
+    print("--- ¡Migración completada con éxito! ---")

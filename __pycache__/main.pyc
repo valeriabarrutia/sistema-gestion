@@ -1,0 +1,171 @@
+from fastapi import FastAPI, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List
+import sqlite3
+
+app = FastAPI(title="Sistema de Gestión Comercial")
+
+# Configuración de CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+DATABASE = "gestion.db"
+
+def get_db_connection():
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# --- MODELOS PYDANTIC ---
+
+class EntidadCreate(BaseModel):
+    nombre: str
+
+class FacturaCreate(BaseModel):
+    entidad_id: Optional[int] = None
+    tipo_comprobante: str
+    numero_comprobante: str
+    fecha: str
+    concepto: str
+    neto_gravado: Optional[float] = 0.0
+    alicuota_iva: Optional[float] = 0.0
+    monto_iva: Optional[float] = 0.0
+    retenciones: Optional[float] = 0.0
+    monto_total: float
+
+class PagoCreate(BaseModel):
+    factura_id: int
+    fecha: str
+    monto: float
+    metodo_pago: str
+
+# --- ENDPOINTS ENTIDADES ---
+
+@app.get("/entidades", name="Obtener Entidades")
+def obtener_entidades():
+    conn = get_db_connection()
+    entidades = conn.execute("SELECT * FROM entidades").fetchall()
+    conn.close()
+    return [dict(e) for e in entidades]
+
+@app.post("/entidades", name="Crear Entidad", status_code=status.HTTP_201_CREATED)
+def crear_entidad(entidad: EntidadCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO entidades (nombre) VALUES (?)", (entidad.nombre,))
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Entidad creada con éxito"}
+
+# --- ENDPOINTS FACTURAS ---
+
+@app.get("/facturas", name="Obtener Facturas")
+def obtener_facturas():
+    conn = get_db_connection()
+    query = """
+        SELECT f.*, COALESCE(e.nombre, 'Desconocido') AS entidad_nombre
+        FROM facturas f
+        LEFT JOIN entidades e ON f.entidad_id = e.id
+        ORDER BY f.id DESC
+    """
+    facturas = conn.execute(query).fetchall()
+    conn.close()
+    return [dict(f) for f in facturas]
+
+@app.post("/facturas", name="Crear Factura", status_code=status.HTTP_201_CREATED)
+def crear_factura(factura: FacturaCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO facturas (
+            entidad_id, tipo_comprobante, numero_comprobante, fecha, 
+            concepto, neto_gravado, alicuota_iva, monto_iva, retenciones, 
+            monto_total, total_pagado, estado
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'PENDIENTE')
+    """, (
+        factura.entidad_id,
+        factura.tipo_comprobante,
+        factura.numero_comprobante,
+        factura.fecha,
+        factura.concepto,
+        factura.neto_gravado,
+        factura.alicuota_iva,
+        factura.monto_iva,
+        factura.retenciones,
+        factura.monto_total
+    ))
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Factura creada con éxito"}
+
+@app.delete("/facturas/{factura_id}", name="Eliminar Factura")
+def eliminar_factura(factura_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    factura = cursor.execute("SELECT * FROM facturas WHERE id = ?", (factura_id,)).fetchone()
+    if not factura:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Factura no encontrada")
+    
+    cursor.execute("DELETE FROM facturas WHERE id = ?", (factura_id,))
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Factura eliminada con éxito"}
+
+# --- ENDPOINTS PAGOS ---
+
+@app.get("/pagos", name="Obtener Pagos")
+def obtener_pagos():
+    conn = get_db_connection()
+    pagos = conn.execute("SELECT * FROM pagos").fetchall()
+    conn.close()
+    return [dict(p) for p in pagos]
+
+@app.post("/pagos", name="Registrar Pago", status_code=status.HTTP_201_CREATED)
+def registrar_pago(pago: PagoCreate):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO pagos (factura_id, fecha, monto, metodo_pago)
+        VALUES (?, ?, ?, ?)
+    """, (pago.factura_id, pago.fecha, pago.monto, pago.metodo_pago))
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Pago registrado con éxito"}
+
+@app.delete("/pagos/{pago_id}", name="Eliminar Pago")
+def eliminar_pago(pago_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    pago = cursor.execute("SELECT * FROM pagos WHERE id = ?", (pago_id,)).fetchone()
+    if not pago:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    
+    cursor.execute("DELETE FROM pagos WHERE id = ?", (pago_id,))
+    conn.commit()
+    conn.close()
+    return {"mensaje": "Pago eliminado con éxito"}
+
+# --- ENDPOINTS REPORTES ---
+
+@app.get("/reportes/resumen-entidades", name="Resumen Entidades")
+def resumen_entidades():
+    conn = get_db_connection()
+    query = """
+        SELECT e.nombre, COUNT(f.id) as total_facturas, SUM(f.monto_total) as monto_total
+        FROM entidades e
+        LEFT JOIN facturas f ON e.id = f.entidad_id
+        GROUP BY e.id
+    """
+    resumen = conn.execute(query).fetchall()
+    conn.close()
+    return [dict(r) for r in resumen]

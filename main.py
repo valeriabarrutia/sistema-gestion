@@ -10,8 +10,10 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Se agrega prepare_threshold=None para compatibilidad con el Pooler de Supabase en psycopg2
 engine = create_engine(
     DATABASE_URL,
+    connect_args={"prepare_threshold": None},
     pool_pre_ping=True,
     pool_recycle=300,
     pool_timeout=30
@@ -23,5 +25,6 @@ app = FastAPI()
 
 try:
     Base.metadata.create_all(bind=engine)
+    print("Conexión con Supabase exitosa.")
 except Exception as e:
     print(f"Error al conectar con Supabase: {e}")
